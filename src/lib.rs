@@ -1,6 +1,16 @@
+use std::fmt::Display;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ServiceTag {
     Bcd,
+}
+
+impl Display for ServiceTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServiceTag::Bcd => write!(f, "BCD"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -11,24 +21,42 @@ pub enum Version {
     V2,
 }
 
+impl Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Version::V1 => write!(f, "001"),
+            Version::V2 => write!(f, "002"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CharacterSet {
     // 1
     UTF8,
+    // todo
     // 2
-    Iso8859_1,
+    // Iso8859_1,
     // 3
-    Iso8859_2,
+    // Iso8859_2,
     // 4
-    Iso8859_4,
+    // Iso8859_4,
     // 5
-    Iso8859_5,
+    // Iso8859_5,
     // 6
-    Iso8859_7,
+    // Iso8859_7,
     // 7
-    Iso8859_10,
+    // Iso8859_10,
     // 8
-    Iso8859_15,
+    // Iso8859_15,
+}
+
+impl Display for CharacterSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CharacterSet::UTF8 => write!(f, "1"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -40,12 +68,30 @@ pub enum Identification {
     Inst,
 }
 
+impl Display for Identification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Identification::Sct => write!(f, "SCT"),
+            Identification::Inst => write!(f, "INST"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Purpose {
     Bene,
     //
     // max len 4
     Custom(String),
+}
+
+impl Display for Purpose {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Purpose::Bene => write!(f, "BENE"),
+            Purpose::Custom(c) => write!(f, "{}", c),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -65,7 +111,7 @@ pub struct Epc {
     // The IBAN of the accout of the Beneficiary
     iban: String,
     // Amount of the SEPA Credit Transfer in Euro
-    amount: Option<f32>,
+    amount: Option<f64>,
     // Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
     // The Remittance Information (Structured), max len 35
@@ -74,6 +120,33 @@ pub struct Epc {
     remittance: Option<String>,
     // Beneficiary to Originator Information
     information: Option<String>,
+}
+
+impl Display for Epc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.service_tag)?;
+        writeln!(f, "{}", self.version)?;
+        writeln!(f, "{}", self.character_set)?;
+        writeln!(f, "{}", self.identification)?;
+        let bic = self.bic.clone().unwrap_or("".to_string());
+        writeln!(f, "{}", bic)?;
+        writeln!(f, "{}", self.beneficiary)?;
+        writeln!(f, "{}", self.iban)?;
+        let amount = self.amount.map(|a| a.to_string()).unwrap_or("".to_string());
+        writeln!(f, "{}", amount)?;
+        let purpose = self
+            .purpose
+            .clone()
+            .map(|p| p.to_string())
+            .unwrap_or("".to_string());
+        writeln!(f, "{}", purpose)?;
+        let remittance_reference = self.remittance_reference.clone().unwrap_or("".to_string());
+        writeln!(f, "{}", remittance_reference)?;
+        let remittance = self.remittance.clone().unwrap_or("".to_string());
+        writeln!(f, "{}", remittance)?;
+        let information = self.information.clone().unwrap_or("".to_string());
+        write!(f, "{}", information)
+    }
 }
 
 pub struct Builder {
@@ -92,7 +165,7 @@ pub struct Builder {
     // The IBAN of the accout of the Beneficiary
     iban: Option<String>,
     // Amount of the SEPA Credit Transfer in Euro
-    amount: Option<f32>,
+    amount: Option<f64>,
     // Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
     // The Remittance Information (Structured), max len 35
@@ -147,11 +220,11 @@ impl Builder {
     }
 
     pub fn iban(mut self, iban: String) -> Self {
-        self.iban = Some(iban);
+        self.iban = Some(iban.replace(" ", ""));
         self
     }
 
-    pub fn amount(mut self, amount: f32) -> Self {
+    pub fn amount(mut self, amount: f64) -> Self {
         self.amount = Some(amount);
         self
     }
@@ -239,7 +312,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn builder_works() {
         let builder = Builder::new();
         assert_eq!(builder.service_tag, ServiceTag::Bcd);
         let builder = builder.version(Version::V1);
@@ -248,12 +321,12 @@ mod tests {
         assert_eq!(builder.character_set, Some(CharacterSet::UTF8));
         let builder = builder.identification(Identification::Sct);
         assert_eq!(builder.identification, Some(Identification::Sct));
-        let builder = builder.bic("BHBLDEHHXXX".to_string());
-        assert_eq!(builder.bic, Some("BHBLDEHHXXX".to_string()));
-        let builder = builder.beneficiary("John Doe".to_string());
-        assert_eq!(builder.beneficiary, Some("John Doe".to_string()));
-        let builder = builder.iban("DE71110220330123456789".to_string());
-        assert_eq!(builder.iban, Some("DE71110220330123456789".to_string()));
+        let builder = builder.bic("GENODEF1SLR".to_string());
+        assert_eq!(builder.bic, Some("GENODEF1SLR".to_string()));
+        let builder = builder.beneficiary("Codeberg e.V.".to_string());
+        assert_eq!(builder.beneficiary, Some("Codeberg e.V.".to_string()));
+        let builder = builder.iban("DE90 8306 5408 0004 1042 42".to_string());
+        assert_eq!(builder.iban, Some("DE90830654080004104242".to_string()));
         let builder = builder.amount(999999999.99);
         assert_eq!(builder.amount, Some(999999999.99));
         let builder = builder.purpose(Purpose::Bene);
@@ -272,5 +345,10 @@ mod tests {
         assert_eq!(builder.information, Some("thanks".to_string()));
         let epc = builder.build();
         assert!(epc.is_ok());
+        let epc = epc.unwrap();
+        assert_eq!(
+            "BCD\n001\n1\nSCT\nGENODEF1SLR\nCodeberg e.V.\nDE90830654080004104242\n999999999.99\nBENE\nRF18539007547034\ncash rules everything around me\nthanks",
+            epc.to_string()
+        );
     }
 }
