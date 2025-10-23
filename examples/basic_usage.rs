@@ -7,9 +7,9 @@ fn main() {
     let builder = builder.version(Version::V1);
     let builder = builder.character_set(CharacterSet::UTF8);
     let builder = builder.identification(Identification::Sct);
-    let builder = builder.bic("GENODEF1SLR".to_string());
-    let builder = builder.beneficiary("Codeberg e.V.".to_string());
-    let builder = builder.iban("DE90 8306 5408 0004 1042 42".to_string());
+    let builder = builder.bic("GENODEF1SLR");
+    let builder = builder.beneficiary("Codeberg e.V.");
+    let builder = builder.iban("DE90 8306 5408 0004 1042 42");
     let builder = builder.amount(10.00);
     let builder = builder.remittance(epcgen::Remittance::Text("for the good cause".to_string()));
     let epc = builder.build();

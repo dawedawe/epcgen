@@ -139,11 +139,12 @@ pub struct Epc {
 
 impl Display for Epc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let empty_string = "".to_string();
         writeln!(f, "{}", self.service_tag)?;
         writeln!(f, "{}", self.version)?;
         writeln!(f, "{}", self.character_set)?;
         writeln!(f, "{}", self.identification)?;
-        let bic = self.bic.clone().unwrap_or("".to_string());
+        let bic = self.bic.as_ref().unwrap_or(&empty_string);
         writeln!(f, "{}", bic)?;
         writeln!(f, "{}", self.beneficiary)?;
         writeln!(f, "{}", self.iban)?;
@@ -151,21 +152,21 @@ impl Display for Epc {
         writeln!(f, "{}", amount)?;
         let purpose = self
             .purpose
-            .clone()
+            .as_ref()
             .map(|p| p.to_string())
             .unwrap_or("".to_string());
         writeln!(f, "{}", purpose)?;
         match &self.remittance {
-            Some(Remittance::Reference(r)) => writeln!(f, "{}\n", r.clone()),
-            Some(Remittance::Text(r)) => writeln!(f, "\n{}", r.clone()),
+            Some(Remittance::Reference(r)) => writeln!(f, "{}\n", r),
+            Some(Remittance::Text(r)) => writeln!(f, "\n{}", r),
             None => writeln!(f, "\n"),
         }?;
-        let information = self.information.clone().unwrap_or("".to_string());
+        let information = self.information.as_ref().unwrap_or(&empty_string);
         write!(f, "{}", information)
     }
 }
 
-pub struct Builder {
+pub struct Builder<'a> {
     // Service Tag
     service_tag: ServiceTag,
     // Version
@@ -175,9 +176,9 @@ pub struct Builder {
     // Identification code
     identification: Option<Identification>,
     // The BIC code of the Beneficiary PSP
-    bic: Option<String>,
+    bic: Option<&'a str>,
     // The name of the accout of the Beneficiary
-    beneficiary: Option<String>,
+    beneficiary: Option<&'a str>,
     // The IBAN of the accout of the Beneficiary
     iban: Option<String>,
     // Amount of the SEPA Credit Transfer in Euro
@@ -187,10 +188,10 @@ pub struct Builder {
     // The Remittance Information (structured or unstructured)
     remittance: Option<Remittance>,
     // Beneficiary to Originator Information
-    information: Option<String>,
+    information: Option<&'a str>,
 }
 
-impl Builder {
+impl<'a> Builder<'a> {
     pub fn new() -> Self {
         Self {
             service_tag: ServiceTag::Bcd,
@@ -222,17 +223,17 @@ impl Builder {
         self
     }
 
-    pub fn bic(mut self, bic: String) -> Self {
+    pub fn bic(mut self, bic: &'a str) -> Self {
         self.bic = Some(bic);
         self
     }
 
-    pub fn beneficiary(mut self, beneficiary: String) -> Self {
+    pub fn beneficiary(mut self, beneficiary: &'a str) -> Self {
         self.beneficiary = Some(beneficiary);
         self
     }
 
-    pub fn iban(mut self, iban: String) -> Self {
+    pub fn iban(mut self, iban: &'a str) -> Self {
         self.iban = Some(iban.replace(" ", ""));
         self
     }
@@ -248,21 +249,16 @@ impl Builder {
     }
 
     pub fn remittance(mut self, remittance: Remittance) -> Self {
-        match remittance {
-            Remittance::Reference(s) if s.len() > 35 => panic!("max len of 35 exceeded"),
-            Remittance::Text(s) if s.len() > 140 => panic!("max len of 140 exceeded"),
-            _ => (),
-        }
         self.remittance = Some(remittance);
         self
     }
 
-    pub fn information(mut self, information: String) -> Self {
+    pub fn information(mut self, information: &'a str) -> Self {
         self.information = Some(information);
         self
     }
 
-    pub fn build(&self) -> Result<Epc, String> {
+    pub fn build(&'_ self) -> Result<Epc, String> {
         let version = if let Some(version) = self.version {
             version
         } else {
@@ -285,7 +281,7 @@ impl Builder {
             return Result::Err("BIC is missing but Version is not V2".to_string());
         }
 
-        let beneficiary = if let Some(beneficiary) = self.beneficiary.clone() {
+        let beneficiary = if let Some(beneficiary) = self.beneficiary {
             beneficiary
         } else {
             return Result::Err("Beneficiary missing".to_string());
@@ -297,23 +293,33 @@ impl Builder {
             return Result::Err("IBAN missing".to_string());
         };
 
+        match &self.remittance {
+            Some(Remittance::Reference(s)) if s.len() > 35 => {
+                return Result::Err("Remittance::Reference max len of 35 exceeded".to_string());
+            }
+            Some(Remittance::Text(s)) if s.len() > 140 => {
+                return Result::Err("Remittance::Text max len of 140 exceeded".to_string());
+            }
+            _ => (),
+        }
+
         Result::Ok(Epc {
             service_tag: self.service_tag,
             version,
             character_set,
             identification,
-            bic: self.bic.clone(),
-            beneficiary,
+            bic: self.bic.map(|s| s.to_string()).clone(),
+            beneficiary: beneficiary.to_string(),
             iban,
             amount: self.amount,
             purpose: self.purpose.clone(),
             remittance: self.remittance.clone(),
-            information: self.information.clone(),
+            information: self.information.map(|s| s.to_string()).clone(),
         })
     }
 }
 
-impl Default for Builder {
+impl<'a> Default for Builder<'a> {
     fn default() -> Self {
         Self::new()
     }
@@ -333,11 +339,13 @@ mod tests {
         assert_eq!(builder.character_set, Some(CharacterSet::UTF8));
         let builder = builder.identification(Identification::Sct);
         assert_eq!(builder.identification, Some(Identification::Sct));
-        let builder = builder.bic("GENODEF1SLR".to_string());
-        assert_eq!(builder.bic, Some("GENODEF1SLR".to_string()));
-        let builder = builder.beneficiary("Codeberg e.V.".to_string());
-        assert_eq!(builder.beneficiary, Some("Codeberg e.V.".to_string()));
-        let builder = builder.iban("DE90 8306 5408 0004 1042 42".to_string());
+        let bic = "GENODEF1SLR";
+        let builder = builder.bic(bic);
+        assert_eq!(builder.bic, Some(bic));
+        let beneficiary = "Codeberg e.V.";
+        let builder = builder.beneficiary(beneficiary);
+        assert_eq!(builder.beneficiary, Some(beneficiary));
+        let builder = builder.iban("DE90 8306 5408 0004 1042 42");
         assert_eq!(builder.iban, Some("DE90830654080004104242".to_string()));
         let builder = builder.amount(999999999.99);
         assert_eq!(builder.amount, Some(999999999.99));
@@ -352,8 +360,8 @@ mod tests {
                 "cash rules everything around me".to_string()
             ))
         );
-        let builder = builder.information("thanks".to_string());
-        assert_eq!(builder.information, Some("thanks".to_string()));
+        let builder = builder.information("thanks");
+        assert_eq!(builder.information, Some("thanks"));
         let epc = builder.build();
         assert!(epc.is_ok());
         let epc = epc.unwrap();
@@ -364,12 +372,17 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn builder_panics() {
+    fn too_long_remittance_reference() {
         let builder = Builder::new();
-        let _ = builder.remittance(Remittance::Reference(
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                .to_string(),
+        let builder = builder.version(Version::V1);
+        let builder = builder.character_set(CharacterSet::UTF8);
+        let builder = builder.identification(Identification::Sct);
+        let builder = builder.bic("GENODEF1SLR");
+        let builder = builder.beneficiary("Codeberg e.V.");
+        let builder = builder.iban("DE90 8306 5408 0004 1042 42");
+        let builder = builder.remittance(Remittance::Reference(
+            "123456789012345678901234567890123456".to_string(),
         ));
+        assert!(builder.build().is_err());
     }
 }
