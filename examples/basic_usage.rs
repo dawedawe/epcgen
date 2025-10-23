@@ -11,7 +11,7 @@ fn main() {
     let builder = builder.beneficiary("Codeberg e.V.".to_string());
     let builder = builder.iban("DE90 8306 5408 0004 1042 42".to_string());
     let builder = builder.amount(10.00);
-    let builder = builder.remittance("for the good cause".to_string());
+    let builder = builder.remittance(epcgen::Remittance::Text("for the good cause".to_string()));
     let epc = builder.build();
     let epc = epc.expect("example should work");
     let qrcode_payload = epc.to_string();

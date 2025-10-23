@@ -94,6 +94,23 @@ impl Display for Purpose {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Remittance {
+    // The structured remittance information, max len 35
+    Reference(String),
+    // The unstructured remittance information, max len 140
+    Text(String),
+}
+
+impl Display for Remittance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Remittance::Reference(r) => write!(f, "{}", r),
+            Remittance::Text(r) => write!(f, "{}", r),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Epc {
     // Service Tag
@@ -114,10 +131,8 @@ pub struct Epc {
     amount: Option<f64>,
     // Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
-    // The Remittance Information (Structured), max len 35
-    remittance_reference: Option<String>,
-    // The Remittance Information (Unstructured), max len 140
-    remittance: Option<String>,
+    // The Remittance Information (structured or unstructured)
+    remittance: Option<Remittance>,
     // Beneficiary to Originator Information
     information: Option<String>,
 }
@@ -140,10 +155,11 @@ impl Display for Epc {
             .map(|p| p.to_string())
             .unwrap_or("".to_string());
         writeln!(f, "{}", purpose)?;
-        let remittance_reference = self.remittance_reference.clone().unwrap_or("".to_string());
-        writeln!(f, "{}", remittance_reference)?;
-        let remittance = self.remittance.clone().unwrap_or("".to_string());
-        writeln!(f, "{}", remittance)?;
+        match &self.remittance {
+            Some(Remittance::Reference(r)) => writeln!(f, "{}\n", r.clone()),
+            Some(Remittance::Text(r)) => writeln!(f, "\n{}", r.clone()),
+            None => writeln!(f, "\n"),
+        }?;
         let information = self.information.clone().unwrap_or("".to_string());
         write!(f, "{}", information)
     }
@@ -168,10 +184,8 @@ pub struct Builder {
     amount: Option<f64>,
     // Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
-    // The Remittance Information (Structured), max len 35
-    remittance_reference: Option<String>,
-    // The Remittance Information (Unstructured), max len 140
-    remittance: Option<String>,
+    // The Remittance Information (structured or unstructured)
+    remittance: Option<Remittance>,
     // Beneficiary to Originator Information
     information: Option<String>,
 }
@@ -188,7 +202,6 @@ impl Builder {
             iban: None,
             amount: None,
             purpose: None,
-            remittance_reference: None,
             remittance: None,
             information: None,
         }
@@ -234,12 +247,12 @@ impl Builder {
         self
     }
 
-    pub fn remittance_reference(mut self, remittance_reference: String) -> Self {
-        self.remittance_reference = Some(remittance_reference);
-        self
-    }
-
-    pub fn remittance(mut self, remittance: String) -> Self {
+    pub fn remittance(mut self, remittance: Remittance) -> Self {
+        match remittance {
+            Remittance::Reference(s) if s.len() > 35 => panic!("max len of 35 exceeded"),
+            Remittance::Text(s) if s.len() > 140 => panic!("max len of 140 exceeded"),
+            _ => (),
+        }
         self.remittance = Some(remittance);
         self
     }
@@ -294,7 +307,6 @@ impl Builder {
             iban,
             amount: self.amount,
             purpose: self.purpose.clone(),
-            remittance_reference: self.remittance_reference.clone(),
             remittance: self.remittance.clone(),
             information: self.information.clone(),
         })
@@ -331,15 +343,14 @@ mod tests {
         assert_eq!(builder.amount, Some(999999999.99));
         let builder = builder.purpose(Purpose::Bene);
         assert_eq!(builder.purpose, Some(Purpose::Bene));
-        let builder = builder.remittance_reference("RF18539007547034".to_string());
-        assert_eq!(
-            builder.remittance_reference,
-            Some("RF18539007547034".to_string())
-        );
-        let builder = builder.remittance("cash rules everything around me".to_string());
+        let builder = builder.remittance(Remittance::Text(
+            "cash rules everything around me".to_string(),
+        ));
         assert_eq!(
             builder.remittance,
-            Some("cash rules everything around me".to_string())
+            Some(Remittance::Text(
+                "cash rules everything around me".to_string()
+            ))
         );
         let builder = builder.information("thanks".to_string());
         assert_eq!(builder.information, Some("thanks".to_string()));
@@ -347,8 +358,18 @@ mod tests {
         assert!(epc.is_ok());
         let epc = epc.unwrap();
         assert_eq!(
-            "BCD\n001\n1\nSCT\nGENODEF1SLR\nCodeberg e.V.\nDE90830654080004104242\n999999999.99\nBENE\nRF18539007547034\ncash rules everything around me\nthanks",
+            "BCD\n001\n1\nSCT\nGENODEF1SLR\nCodeberg e.V.\nDE90830654080004104242\n999999999.99\nBENE\n\ncash rules everything around me\nthanks",
             epc.to_string()
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn builder_panics() {
+        let builder = Builder::new();
+        let _ = builder.remittance(Remittance::Reference(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_string(),
+        ));
     }
 }
