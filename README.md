@@ -5,4 +5,4 @@ As epcgen only provides the payload for the QR code, it can be used with any QR 
 Take a look at the examples.
 
 Here's a code carrying data generated with epcgen.  
-![examples_basic_usage_qrcode.png](./examples_basic_usage_qrcode.png)
+![examples.png](./example.png)
