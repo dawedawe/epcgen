@@ -137,6 +137,11 @@ pub struct Epc {
     information: Option<String>,
 }
 
+impl<'a> Epc {
+    pub fn builder() -> Builder<'a> {
+        Builder::default()
+    }
+}
 impl Display for Epc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let empty_string = "".to_string();
@@ -373,16 +378,16 @@ mod tests {
 
     #[test]
     fn too_long_remittance_reference() {
-        let builder = Builder::new();
-        let builder = builder.version(Version::V1);
-        let builder = builder.character_set(CharacterSet::UTF8);
-        let builder = builder.identification(Identification::Sct);
-        let builder = builder.bic("GENODEF1SLR");
-        let builder = builder.beneficiary("Codeberg e.V.");
-        let builder = builder.iban("DE90 8306 5408 0004 1042 42");
-        let builder = builder.remittance(Remittance::Reference(
-            "123456789012345678901234567890123456".to_string(),
-        ));
+        let builder = Epc::builder()
+            .version(Version::V1)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .bic("GENODEF1SLR")
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference(
+                "123456789012345678901234567890123456".to_string(),
+            ));
         assert!(builder.build().is_err());
     }
 }
