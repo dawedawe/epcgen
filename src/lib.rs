@@ -64,7 +64,6 @@ pub enum Identification {
     // SEPA Credit Transfer
     Sct,
     // Sepa Instant Credit Transfer
-    // todo test if already supported by apps
     Inst,
 }
 
@@ -80,7 +79,7 @@ impl Display for Identification {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Purpose {
     Bene,
-    //
+    // Todo add more
     // max len 4
     Custom(String),
 }
@@ -293,12 +292,23 @@ impl<'a> Builder<'a> {
         };
 
         let iban = if let Some(iban) = self.iban.clone() {
+            // ToDo Verification
             iban
         } else {
             return Result::Err("IBAN missing".to_string());
         };
 
+        match &self.purpose {
+            Some(Purpose::Custom(p))
+                if p.len() != 4 || p.chars().any(|c| !c.is_ascii_uppercase()) =>
+            {
+                return Result::Err("Invalid Purpose".to_string());
+            }
+            _ => (),
+        }
+
         match &self.remittance {
+            // Todo check structure
             Some(Remittance::Reference(s)) if s.len() > 35 => {
                 return Result::Err("Remittance::Reference max len of 35 exceeded".to_string());
             }
@@ -377,7 +387,108 @@ mod tests {
     }
 
     #[test]
-    fn too_long_remittance_reference() {
+    fn missing_version_should_fail() {
+        let builder = Epc::builder()
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .bic("GENODEF1SLR")
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn missing_character_set_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .identification(Identification::Sct)
+            .bic("GENODEF1SLR")
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn missing_identification_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .character_set(CharacterSet::UTF8)
+            .bic("GENODEF1SLR")
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn missing_bic_in_version1_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V1)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn missing_bic_in_version2_should_succeed() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_ok());
+    }
+
+    #[test]
+    fn missing_beneficiary_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn missing_iban_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .beneficiary("Codeberg e.V.")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn invalid_purpose_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .purpose(Purpose::Custom("ABCDE".to_string()))
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+
+        let builder = builder.purpose(Purpose::Custom("ABC".to_string()));
+        assert!(builder.build().is_err());
+
+        let builder = builder.purpose(Purpose::Custom("ABC1".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn too_long_remittance_reference_should_fail() {
         let builder = Epc::builder()
             .version(Version::V1)
             .character_set(CharacterSet::UTF8)
