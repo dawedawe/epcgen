@@ -1,5 +1,64 @@
 use std::fmt::Display;
 
+use crate::iban::is_valid;
+
+pub mod iban {
+    fn transform(iban: &str) -> u128 {
+        let first4 = iban.get(0..4).expect("expected IBAN with len >= 4");
+        let after4 = iban.get(4..).expect("expected IBAN with len >= 5");
+        let switched = format!("{after4}{first4}");
+        let replaced: String = switched
+            .chars()
+            .map(|c| {
+                if c.is_numeric() {
+                    c.to_string()
+                } else {
+                    let v = c as u32 - 64 + 9;
+                    v.to_string()
+                }
+            })
+            .collect();
+        replaced
+            .as_str()
+            .parse()
+            .expect("expected parseable string")
+    }
+
+    pub fn is_valid(iban: &str) -> bool {
+        iban.len() > 4
+            && iban.len() <= 34
+            && iban
+                .get(0..2)
+                .unwrap()
+                .chars()
+                .all(|c| c.is_ascii_uppercase())
+            && iban
+                .get(2..)
+                .unwrap()
+                .chars()
+                .all(|c| c.is_numeric() || c.is_ascii_uppercase())
+            && transform(iban) % 97 == 1
+    }
+
+    #[test]
+    fn transforming_ibans_works() {
+        assert_eq!(
+            transform("DE68210501700012345678"),
+            210501700012345678131468
+        );
+        assert_eq!(
+            transform("GB82WEST12345698765432"),
+            3214282912345698765432161182
+        )
+    }
+
+    #[test]
+    fn invalid_ibans_should_fail() {
+        assert!(!is_valid(""));
+        assert!(!is_valid("DE90830654080004104243"));
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ServiceTag {
     Bcd,
@@ -292,8 +351,11 @@ impl<'a> Builder<'a> {
         };
 
         let iban = if let Some(iban) = self.iban.clone() {
-            // ToDo Verification
-            iban
+            if is_valid(iban.as_str()) {
+                iban
+            } else {
+                return Result::Err("Invalid IBAN".to_string());
+            }
         } else {
             return Result::Err("IBAN missing".to_string());
         };
@@ -463,6 +525,17 @@ mod tests {
             .version(Version::V2)
             .character_set(CharacterSet::UTF8)
             .identification(Identification::Sct)
+            .beneficiary("Codeberg e.V.")
+            .remittance(Remittance::Reference("1234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+    #[test]
+    fn invalid_iban_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .iban("DE90 8306 5408 0004 1042 43")
             .beneficiary("Codeberg e.V.")
             .remittance(Remittance::Reference("1234567890".to_string()));
         assert!(builder.build().is_err());
