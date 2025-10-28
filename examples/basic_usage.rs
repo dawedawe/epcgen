@@ -3,13 +3,17 @@ use image::Luma;
 use qrcode::QrCode;
 
 fn main() {
+    let iban = "DE90 8306 5408 0004 1042 42";
+    assert!(epcgen::iban::is_valid(iban));
+    let unused_ref = "RF45G72UUR";
+    assert!(epcgen::rf::is_valid(unused_ref));
     let builder = Epc::builder()
         .version(Version::V1)
         .character_set(CharacterSet::UTF8)
         .identification(Identification::Sct)
         .bic("GENODEF1SLR")
         .beneficiary("Codeberg e.V.")
-        .iban("DE90 8306 5408 0004 1042 42")
+        .iban(iban)
         .amount(10.00)
         .remittance(epcgen::Remittance::Text("for the good cause".to_string()));
     let epc = builder.build();

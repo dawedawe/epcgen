@@ -1,4 +1,5 @@
-use crate::iban::is_valid;
+use crate::ibanrf::iban;
+use crate::ibanrf::rf;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -293,7 +294,7 @@ impl<'a> Builder<'a> {
         };
 
         let iban = if let Some(iban) = self.iban.clone() {
-            if is_valid(iban.as_str()) {
+            if iban::is_valid(iban.as_str()) {
                 iban
             } else {
                 return Result::Err("Invalid IBAN".to_string());
@@ -312,9 +313,10 @@ impl<'a> Builder<'a> {
         }
 
         match &self.remittance {
-            // Todo check structure
-            Some(Remittance::Reference(s)) if s.len() > 35 => {
-                return Result::Err("Remittance::Reference max len of 35 exceeded".to_string());
+            Some(Remittance::Reference(s)) => {
+                if !rf::is_valid(s) {
+                    return Result::Err("Invalid Remittance::Reference".to_string());
+                }
             }
             Some(Remittance::Text(s)) if s.len() > 140 => {
                 return Result::Err("Remittance::Text max len of 140 exceeded".to_string());
@@ -446,7 +448,7 @@ mod tests {
             .identification(Identification::Sct)
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Reference("RF471234567890".to_string()));
         assert!(builder.build().is_ok());
     }
 
@@ -503,7 +505,7 @@ mod tests {
     }
 
     #[test]
-    fn too_long_remittance_reference_should_fail() {
+    fn invalid_remittance_reference_should_fail() {
         let builder = Epc::builder()
             .version(Version::V1)
             .character_set(CharacterSet::UTF8)
