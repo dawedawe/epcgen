@@ -4,9 +4,9 @@ matrix:
 steps:
   test:
     when:
-      - event: push
-        branch: main
-      - event: pull_request
+      event: [push, pull_request]
+      branch: main
+      target: main
     image: rust
     environment:
       CARGO_TERM_COLOR: always
