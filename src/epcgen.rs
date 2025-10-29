@@ -129,7 +129,7 @@ pub struct Epc {
     /// The IBAN of the accout of the Beneficiary
     iban: String,
     /// Amount of the SEPA Credit Transfer in Euro
-    amount: Option<f64>,
+    amount: Option<String>,
     /// Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
     /// The Remittance Information (structured or unstructured)
@@ -154,7 +154,7 @@ impl Display for Epc {
         writeln!(f, "{}", bic)?;
         writeln!(f, "{}", self.beneficiary)?;
         writeln!(f, "{}", self.iban)?;
-        let amount = self.amount.map(|a| a.to_string()).unwrap_or("".to_string());
+        let amount = self.amount.as_ref().unwrap_or(&empty_string);
         writeln!(f, "{}", amount)?;
         let purpose = self
             .purpose
@@ -188,7 +188,7 @@ pub struct Builder<'a> {
     /// The IBAN of the accout of the Beneficiary
     iban: Option<String>,
     /// Amount of the SEPA Credit Transfer in Euro
-    amount: Option<f64>,
+    amount: Option<&'a str>,
     /// Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
     /// The Remittance Information (structured or unstructured)
@@ -251,7 +251,7 @@ impl<'a> Builder<'a> {
     }
 
     /// Set the amount of the transfer
-    pub fn amount(mut self, amount: f64) -> Self {
+    pub fn amount(mut self, amount: &'a str) -> Self {
         self.amount = Some(amount);
         self
     }
@@ -314,6 +314,27 @@ impl<'a> Builder<'a> {
             return Result::Err("IBAN missing".to_string());
         };
 
+        let amount = if let Some(amount) = self.amount {
+            let ok = amount.chars().all(|c| c.is_ascii_digit() || c == '.');
+            if ok && let Some((i_part, d_part)) = amount.split_once(".") {
+                match (i_part.parse::<i128>(), d_part.parse::<i32>()) {
+                    (Ok(i_part), Ok(d_part)) if i_part == 0 && (1..=99).contains(&d_part) => {
+                        self.amount
+                    }
+                    (Ok(i_part), Ok(d_part))
+                        if (1..=999999999).contains(&i_part) && (0..=99).contains(&d_part) =>
+                    {
+                        self.amount
+                    }
+                    (_, _) => return Result::Err("invalid amount".to_string()),
+                }
+            } else {
+                return Result::Err("invalid amount".to_string());
+            }
+        } else {
+            None
+        };
+
         match &self.purpose {
             Some(Purpose::Custom(p))
                 if p.len() != 4 || p.chars().any(|c| !c.is_ascii_uppercase()) =>
@@ -340,10 +361,10 @@ impl<'a> Builder<'a> {
             version,
             character_set,
             identification,
-            bic: self.bic.map(|s| s.to_string()).clone(),
+            bic: self.bic.map(|s| s.to_string()),
             beneficiary: beneficiary.to_string(),
             iban,
-            amount: self.amount,
+            amount: amount.map(|s| s.to_string()),
             purpose: self.purpose.clone(),
             remittance: self.remittance.clone(),
             information: self.information.map(|s| s.to_string()).clone(),
@@ -379,8 +400,8 @@ mod tests {
         assert_eq!(builder.beneficiary, Some(beneficiary));
         let builder = builder.iban("DE90 8306 5408 0004 1042 42");
         assert_eq!(builder.iban, Some("DE90830654080004104242".to_string()));
-        let builder = builder.amount(999999999.99);
-        assert_eq!(builder.amount, Some(999999999.99));
+        let builder = builder.amount("999999999.99");
+        assert_eq!(builder.amount, Some("999999999.99"));
         let builder = builder.purpose(Purpose::Bene);
         assert_eq!(builder.purpose, Some(Purpose::Bene));
         let builder = builder.remittance(Remittance::Text(
@@ -411,7 +432,7 @@ mod tests {
             .bic("GENODEF1SLR")
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Text("1234567890".to_string()));
         assert!(builder.build().is_err());
     }
 
@@ -423,7 +444,7 @@ mod tests {
             .bic("GENODEF1SLR")
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Text("1234567890".to_string()));
         assert!(builder.build().is_err());
     }
 
@@ -435,7 +456,7 @@ mod tests {
             .bic("GENODEF1SLR")
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Text("1234567890".to_string()));
         assert!(builder.build().is_err());
     }
 
@@ -447,7 +468,7 @@ mod tests {
             .identification(Identification::Sct)
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Reference("RF471234567890".to_string()));
         assert!(builder.build().is_err());
     }
 
@@ -470,7 +491,7 @@ mod tests {
             .character_set(CharacterSet::UTF8)
             .identification(Identification::Sct)
             .iban("DE90 8306 5408 0004 1042 42")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Reference("RF471234567890".to_string()));
         assert!(builder.build().is_err());
     }
 
@@ -481,9 +502,10 @@ mod tests {
             .character_set(CharacterSet::UTF8)
             .identification(Identification::Sct)
             .beneficiary("Codeberg e.V.")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Reference("RF471234567890".to_string()));
         assert!(builder.build().is_err());
     }
+
     #[test]
     fn invalid_iban_should_fail() {
         let builder = Epc::builder()
@@ -492,7 +514,28 @@ mod tests {
             .identification(Identification::Sct)
             .iban("DE90 8306 5408 0004 1042 43")
             .beneficiary("Codeberg e.V.")
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Reference("RF471234567890".to_string()));
+        assert!(builder.build().is_err());
+    }
+
+    #[test]
+    fn invalid_amount_should_fail() {
+        let builder = Epc::builder()
+            .version(Version::V2)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .iban("DE90 8306 5408 0004 1042 42")
+            .amount("-0.01")
+            .beneficiary("Codeberg e.V.")
+            .remittance(Remittance::Text("foo".to_string()));
+        assert!(builder.build().is_err());
+
+        let builder = builder.amount("0.00");
+        assert!(builder.build().is_err());
+
+        let builder = builder.amount("1..00");
+        assert!(builder.build().is_err());
+        let builder = builder.amount("9999999990.99");
         assert!(builder.build().is_err());
     }
 
@@ -505,7 +548,7 @@ mod tests {
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
             .purpose(Purpose::Custom("ABCDE".to_string()))
-            .remittance(Remittance::Reference("1234567890".to_string()));
+            .remittance(Remittance::Text("foo".to_string()));
         assert!(builder.build().is_err());
 
         let builder = builder.purpose(Purpose::Custom("ABC".to_string()));
