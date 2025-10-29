@@ -22,6 +22,7 @@ fn transform(s: &str) -> u128 {
 pub mod iban {
     use crate::ibanrf::transform;
 
+    /// Check the validity of an IBAN
     pub fn is_valid(iban: &str) -> bool {
         let iban = iban.replace(" ", "");
         iban.len() > 4
@@ -43,6 +44,7 @@ pub mod iban {
 pub mod rf {
     use crate::ibanrf::transform;
 
+    /// Check the validity of a structured RF creditor reference
     pub fn is_valid(reference: &str) -> bool {
         reference.len() > 4
             && reference.len() <= 25

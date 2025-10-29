@@ -17,9 +17,9 @@ impl Display for ServiceTag {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Version {
-    // 001 - EWR plus Non-EWR
+    /// 001 - EWR plus Non-EWR
     V1,
-    // 002 - only EWR
+    /// 002 - only EWR
     V2,
 }
 
@@ -34,7 +34,7 @@ impl Display for Version {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CharacterSet {
-    // 1
+    /// 1
     UTF8,
     // todo
     // 2
@@ -63,9 +63,9 @@ impl Display for CharacterSet {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Identification {
-    // SEPA Credit Transfer
+    /// SEPA Credit Transfer
     Sct,
-    // Sepa Instant Credit Transfer
+    /// Sepa Instant Credit Transfer
     Inst,
 }
 
@@ -82,7 +82,7 @@ impl Display for Identification {
 pub enum Purpose {
     Bene,
     // Todo add more
-    // max len 4
+    /// A custom purpose code, max len 4
     Custom(String),
 }
 
@@ -97,9 +97,9 @@ impl Display for Purpose {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Remittance {
-    // The structured remittance information, max len 35
+    /// The structured RF creditor reference
     Reference(String),
-    // The unstructured remittance information, max len 140
+    /// The unstructured remittance information, max len 140
     Text(String),
 }
 
@@ -114,27 +114,27 @@ impl Display for Remittance {
 
 #[derive(Debug, PartialEq)]
 pub struct Epc {
-    // Service Tag
+    /// Service Tag
     service_tag: ServiceTag,
-    // Version
+    /// Version
     version: Version,
-    // Character set
+    /// Character set
     character_set: CharacterSet,
-    // Identification code
+    /// Identification code
     identification: Identification,
-    // The BIC code of the Beneficiary PSP
+    /// The BIC code of the Beneficiary PSP
     bic: Option<String>,
-    // The name of the accout of the Beneficiary
+    /// The name of the accout of the Beneficiary
     beneficiary: String,
-    // The IBAN of the accout of the Beneficiary
+    /// The IBAN of the accout of the Beneficiary
     iban: String,
-    // Amount of the SEPA Credit Transfer in Euro
+    /// Amount of the SEPA Credit Transfer in Euro
     amount: Option<f64>,
-    // Purpose of the SEPA Credit Transfer
+    /// Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
-    // The Remittance Information (structured or unstructured)
+    /// The Remittance Information (structured or unstructured)
     remittance: Option<Remittance>,
-    // Beneficiary to Originator Information
+    /// Beneficiary to Originator Information
     information: Option<String>,
 }
 
@@ -173,27 +173,27 @@ impl Display for Epc {
 }
 
 pub struct Builder<'a> {
-    // Service Tag
+    /// Service Tag
     service_tag: ServiceTag,
-    // Version
+    /// Version
     version: Option<Version>,
-    // Character set
+    /// Character set
     character_set: Option<CharacterSet>,
-    // Identification code
+    /// Identification code
     identification: Option<Identification>,
-    // The BIC code of the Beneficiary PSP
+    /// The BIC code of the Beneficiary PSP
     bic: Option<&'a str>,
-    // The name of the accout of the Beneficiary
+    /// The name of the accout of the Beneficiary
     beneficiary: Option<&'a str>,
-    // The IBAN of the accout of the Beneficiary
+    /// The IBAN of the accout of the Beneficiary
     iban: Option<String>,
-    // Amount of the SEPA Credit Transfer in Euro
+    /// Amount of the SEPA Credit Transfer in Euro
     amount: Option<f64>,
-    // Purpose of the SEPA Credit Transfer
+    /// Purpose of the SEPA Credit Transfer
     purpose: Option<Purpose>,
-    // The Remittance Information (structured or unstructured)
+    /// The Remittance Information (structured or unstructured)
     remittance: Option<Remittance>,
-    // Beneficiary to Originator Information
+    /// Beneficiary to Originator Information
     information: Option<&'a str>,
 }
 
@@ -214,56 +214,67 @@ impl<'a> Builder<'a> {
         }
     }
 
+    /// Set the Version
     pub fn version(mut self, version: Version) -> Self {
         self.version = Some(version);
         self
     }
 
+    /// Set the CharacterSet
     pub fn character_set(mut self, character_set: CharacterSet) -> Self {
         self.character_set = Some(character_set);
         self
     }
 
+    /// Set the Identification
     pub fn identification(mut self, identification: Identification) -> Self {
         self.identification = Some(identification);
         self
     }
 
+    /// Set the BIC (Business Identifier Code) of the recipient bank
     pub fn bic(mut self, bic: &'a str) -> Self {
         self.bic = Some(bic);
         self
     }
 
+    /// Set the name of the beneficiary
     pub fn beneficiary(mut self, beneficiary: &'a str) -> Self {
         self.beneficiary = Some(beneficiary);
         self
     }
 
+    /// Set the IBAN of the beneficiary
     pub fn iban(mut self, iban: &'a str) -> Self {
         self.iban = Some(iban.replace(" ", ""));
         self
     }
 
+    /// Set the amount of the transfer
     pub fn amount(mut self, amount: f64) -> Self {
         self.amount = Some(amount);
         self
     }
 
+    /// Set the purpose code
     pub fn purpose(mut self, purpose: Purpose) -> Self {
         self.purpose = Some(purpose);
         self
     }
 
+    /// Set the Remittance (reference)
     pub fn remittance(mut self, remittance: Remittance) -> Self {
         self.remittance = Some(remittance);
         self
     }
 
+    /// Set the Beneficiary to Originator information
     pub fn information(mut self, information: &'a str) -> Self {
         self.information = Some(information);
         self
     }
 
+    /// Build the resulting Epc
     pub fn build(&'_ self) -> Result<Epc, String> {
         let version = if let Some(version) = self.version {
             version
