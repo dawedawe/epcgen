@@ -14,7 +14,7 @@ fn main() {
         .bic("GENODEF1SLR")
         .beneficiary("Codeberg e.V.")
         .iban(iban)
-        .amount(10.00)
+        .amount("10.00")
         .remittance(epcgen::Remittance::Text("for the good cause".to_string()));
     let epc = builder.build();
     let epc = epc.expect("example should work");
