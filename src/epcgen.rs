@@ -1,5 +1,6 @@
 use crate::ibanrf::iban;
 use crate::ibanrf::rf;
+use std::error::Error;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -172,6 +173,53 @@ impl Display for Epc {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum EpcError {
+    MissingVersion,
+    MissingCharacterSet,
+    MissingIdentification,
+    BICRequiredInConfiguredVersion,
+    MissingBeneficiary,
+    InvalidIBAN,
+    MissingIBAN,
+    InvalidAmount,
+    InvalidPurpose,
+    InvalidRemittanceReference,
+    RemittanceTextTooLong,
+}
+
+impl Display for EpcError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EpcError::MissingVersion => write!(f, "Version missing"),
+            EpcError::MissingCharacterSet => write!(f, "CharacterSet missing"),
+            EpcError::MissingIdentification => write!(f, "Identification missing"),
+            EpcError::BICRequiredInConfiguredVersion => {
+                write!(f, "BIC is missing but configured Version requires it")
+            }
+            EpcError::MissingBeneficiary => write!(f, "Beneficiary missing"),
+            EpcError::InvalidIBAN => write!(f, "Invalid IBAN"),
+            EpcError::MissingIBAN => write!(f, "IBAN missing"),
+            EpcError::InvalidAmount => write!(f, "Invalid amount"),
+            EpcError::InvalidPurpose => write!(f, "Invalid purpose"),
+            EpcError::InvalidRemittanceReference => {
+                write!(f, "Invalid structured RF creditor reference")
+            }
+            EpcError::RemittanceTextTooLong => write!(f, "Remittance text too long (max len 140)"),
+        }
+    }
+}
+
+impl Error for EpcError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+
+    fn cause(&self) -> Option<&dyn Error> {
+        self.source()
+    }
+}
+
 pub struct Builder<'a> {
     /// Service Tag
     service_tag: ServiceTag,
@@ -275,48 +323,52 @@ impl<'a> Builder<'a> {
     }
 
     /// Build the resulting Epc
-    pub fn build(&'_ self) -> Result<Epc, String> {
+    pub fn build(&'_ self) -> Result<Epc, EpcError> {
         let version = if let Some(version) = self.version {
             version
         } else {
-            return Result::Err("Version missing".to_string());
+            return Result::Err(EpcError::MissingVersion);
         };
 
         let character_set = if let Some(character_set) = self.character_set {
             character_set
         } else {
-            return Result::Err("CharacterSet missing".to_string());
+            return Result::Err(EpcError::MissingCharacterSet);
         };
 
         let identification = if let Some(identification) = self.identification {
             identification
         } else {
-            return Result::Err("Identification missing".to_string());
+            return Result::Err(EpcError::MissingIdentification);
         };
 
         if self.bic.is_none() && version != Version::V2 {
-            return Result::Err("BIC is missing but Version is not V2".to_string());
+            return Result::Err(EpcError::BICRequiredInConfiguredVersion);
         }
 
         let beneficiary = if let Some(beneficiary) = self.beneficiary {
             beneficiary
         } else {
-            return Result::Err("Beneficiary missing".to_string());
+            return Result::Err(EpcError::MissingBeneficiary);
         };
 
         let iban = if let Some(iban) = self.iban.clone() {
             if iban::is_valid(iban.as_str()) {
                 iban
             } else {
-                return Result::Err("Invalid IBAN".to_string());
+                return Result::Err(EpcError::InvalidIBAN);
             }
         } else {
-            return Result::Err("IBAN missing".to_string());
+            return Result::Err(EpcError::MissingIBAN);
         };
 
         let amount = if let Some(amount) = self.amount {
             let ok = amount.chars().all(|c| c.is_ascii_digit() || c == '.');
-            if ok && let Some((i_part, d_part)) = amount.split_once(".") {
+            if ok
+                && let Some((i_part, d_part)) = amount.split_once(".")
+                && i_part.len() <= 9
+                && d_part.len() == 2
+            {
                 match (i_part.parse::<i128>(), d_part.parse::<i32>()) {
                     (Ok(i_part), Ok(d_part)) if i_part == 0 && (1..=99).contains(&d_part) => {
                         self.amount
@@ -326,10 +378,10 @@ impl<'a> Builder<'a> {
                     {
                         self.amount
                     }
-                    (_, _) => return Result::Err("invalid amount".to_string()),
+                    (_, _) => return Result::Err(EpcError::InvalidAmount),
                 }
             } else {
-                return Result::Err("invalid amount".to_string());
+                return Result::Err(EpcError::InvalidAmount);
             }
         } else {
             None
@@ -339,7 +391,7 @@ impl<'a> Builder<'a> {
             Some(Purpose::Custom(p))
                 if p.len() != 4 || p.chars().any(|c| !c.is_ascii_uppercase()) =>
             {
-                return Result::Err("Invalid Purpose".to_string());
+                return Result::Err(EpcError::InvalidPurpose);
             }
             _ => (),
         }
@@ -347,11 +399,11 @@ impl<'a> Builder<'a> {
         match &self.remittance {
             Some(Remittance::Reference(s)) => {
                 if !rf::is_valid(s) {
-                    return Result::Err("Invalid Remittance::Reference".to_string());
+                    return Result::Err(EpcError::InvalidRemittanceReference);
                 }
             }
             Some(Remittance::Text(s)) if s.len() > 140 => {
-                return Result::Err("Remittance::Text max len of 140 exceeded".to_string());
+                return Result::Err(EpcError::RemittanceTextTooLong);
             }
             _ => (),
         }
@@ -433,7 +485,8 @@ mod tests {
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
             .remittance(Remittance::Text("1234567890".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::MissingVersion));
     }
 
     #[test]
@@ -445,7 +498,8 @@ mod tests {
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
             .remittance(Remittance::Text("1234567890".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::MissingCharacterSet));
     }
 
     #[test]
@@ -457,7 +511,8 @@ mod tests {
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
             .remittance(Remittance::Text("1234567890".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::MissingIdentification));
     }
 
     #[test]
@@ -469,7 +524,8 @@ mod tests {
             .beneficiary("Codeberg e.V.")
             .iban("DE90 8306 5408 0004 1042 42")
             .remittance(Remittance::Reference("RF471234567890".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::BICRequiredInConfiguredVersion));
     }
 
     #[test]
@@ -492,7 +548,8 @@ mod tests {
             .identification(Identification::Sct)
             .iban("DE90 8306 5408 0004 1042 42")
             .remittance(Remittance::Reference("RF471234567890".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::MissingBeneficiary));
     }
 
     #[test]
@@ -503,7 +560,8 @@ mod tests {
             .identification(Identification::Sct)
             .beneficiary("Codeberg e.V.")
             .remittance(Remittance::Reference("RF471234567890".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::MissingIBAN));
     }
 
     #[test]
@@ -515,7 +573,8 @@ mod tests {
             .iban("DE90 8306 5408 0004 1042 43")
             .beneficiary("Codeberg e.V.")
             .remittance(Remittance::Reference("RF471234567890".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidIBAN));
     }
 
     #[test]
@@ -528,15 +587,24 @@ mod tests {
             .amount("-0.01")
             .beneficiary("Codeberg e.V.")
             .remittance(Remittance::Text("foo".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidAmount));
 
         let builder = builder.amount("0.00");
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidAmount));
+
+        let builder = builder.amount("1.000");
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidAmount));
 
         let builder = builder.amount("1..00");
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidAmount));
+
         let builder = builder.amount("9999999990.99");
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidAmount));
     }
 
     #[test]
@@ -549,13 +617,16 @@ mod tests {
             .iban("DE90 8306 5408 0004 1042 42")
             .purpose(Purpose::Custom("ABCDE".to_string()))
             .remittance(Remittance::Text("foo".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidPurpose));
 
         let builder = builder.purpose(Purpose::Custom("ABC".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidPurpose));
 
         let builder = builder.purpose(Purpose::Custom("ABC1".to_string()));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidPurpose));
     }
 
     #[test]
@@ -570,6 +641,7 @@ mod tests {
             .remittance(Remittance::Reference(
                 "123456789012345678901234567890123456".to_string(),
             ));
-        assert!(builder.build().is_err());
+        let r = builder.build();
+        assert_eq!(r, Result::Err(EpcError::InvalidRemittanceReference));
     }
 }
