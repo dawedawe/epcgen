@@ -3,8 +3,10 @@ use crate::ibanrf::rf;
 use std::error::Error;
 use std::fmt::Display;
 
+/// Service tag for EPC QR codes
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ServiceTag {
+    /// BCD - EPC Quick Response Code
     Bcd,
 }
 
@@ -16,11 +18,12 @@ impl Display for ServiceTag {
     }
 }
 
+/// Version of the EPC QR code standard
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Version {
-    /// 001 - EWR plus Non-EWR
+    /// 001 - EWR plus Non-EWR (BIC required)
     V1,
-    /// 002 - only EWR
+    /// 002 - only EWR (BIC optional)
     V2,
 }
 
@@ -33,9 +36,10 @@ impl Display for Version {
     }
 }
 
+/// Character set encoding for the EPC QR code
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CharacterSet {
-    /// 1
+    /// UTF-8 character set (value: 1)
     UTF8,
     // todo
     // 2
@@ -62,11 +66,12 @@ impl Display for CharacterSet {
     }
 }
 
+/// Identification code for the type of SEPA credit transfer
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Identification {
-    /// SEPA Credit Transfer
+    /// SEPA Credit Transfer (SCT)
     Sct,
-    /// Sepa Instant Credit Transfer
+    /// SEPA Instant Credit Transfer (INST)
     Inst,
 }
 
@@ -79,11 +84,13 @@ impl Display for Identification {
     }
 }
 
+/// Purpose code for the SEPA credit transfer
 #[derive(Debug, PartialEq, Clone)]
 pub enum Purpose {
+    /// BENE - Benefit payment
     Bene,
     // Todo add more
-    /// A custom purpose code, max len 4
+    /// A custom purpose code (must be exactly 4 uppercase ASCII characters)
     Custom(String),
 }
 
@@ -96,11 +103,12 @@ impl Display for Purpose {
     }
 }
 
+/// Remittance information for the payment
 #[derive(Debug, PartialEq, Clone)]
 pub enum Remittance {
-    /// The structured RF creditor reference
+    /// Structured RF creditor reference (validated against ISO 11649)
     Reference(String),
-    /// The unstructured remittance information, max len 140
+    /// Unstructured remittance information (max length: 140 characters)
     Text(String),
 }
 
@@ -113,6 +121,9 @@ impl Display for Remittance {
     }
 }
 
+/// EPC QR code data structure
+///
+/// Use [`Epc::builder()`] to create instances.
 #[derive(Debug, PartialEq)]
 pub struct Epc {
     /// Service Tag
@@ -140,6 +151,7 @@ pub struct Epc {
 }
 
 impl<'a> Epc {
+    /// Creates a new builder for constructing an EPC QR code
     pub fn builder() -> Builder<'a> {
         Builder::default()
     }
@@ -173,6 +185,7 @@ impl Display for Epc {
     }
 }
 
+/// Errors that can occur when building an EPC QR code
 #[derive(Debug, PartialEq)]
 pub enum EpcError {
     MissingVersion,
@@ -214,12 +227,11 @@ impl Error for EpcError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        self.source()
-    }
 }
 
+/// Builder for creating EPC QR code instances
+///
+/// Use [`Epc::builder()`] to get a new builder instance.
 pub struct Builder<'a> {
     /// Service Tag
     service_tag: ServiceTag,
@@ -419,7 +431,7 @@ impl<'a> Builder<'a> {
             amount: amount.map(|s| s.to_string()),
             purpose: self.purpose.clone(),
             remittance: self.remittance.clone(),
-            information: self.information.map(|s| s.to_string()).clone(),
+            information: self.information.map(|s| s.to_string()),
         })
     }
 }

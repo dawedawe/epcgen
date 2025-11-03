@@ -1,6 +1,6 @@
 fn transform(s: &str) -> u128 {
-    let first4 = s.get(0..4).expect("expected IBAN with len >= 4");
-    let after4 = s.get(4..).expect("expected IBAN with len >= 5");
+    let first4 = s.get(0..4).unwrap_or("");
+    let after4 = s.get(4..).unwrap_or("");
     let switched = format!("{after4}{first4}");
     let replaced: String = switched
         .chars()
@@ -8,21 +8,36 @@ fn transform(s: &str) -> u128 {
             if c.is_numeric() {
                 c.to_string()
             } else {
-                let v = c as u32 - 64 + 9;
+                let v = c as u32 - 55; // 'A' is 65, we want 10, so 65 - 55 = 10
                 v.to_string()
             }
         })
         .collect();
-    replaced
-        .as_str()
-        .parse()
-        .expect("expected parseable string")
+    replaced.as_str().parse().unwrap_or(0)
 }
 
+/// IBAN validation functions
 pub mod iban {
     use crate::ibanrf::transform;
 
-    /// Check the validity of an IBAN
+    /// Check the validity of an IBAN using the ISO 13616 standard
+    ///
+    /// # Arguments
+    ///
+    /// * `iban` - The IBAN string to validate (spaces are allowed and will be removed)
+    ///
+    /// # Returns
+    ///
+    /// `true` if the IBAN is valid, `false` otherwise
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use epcgen::iban;
+    ///
+    /// assert!(iban::is_valid("DE90 8306 5408 0004 1042 42"));
+    /// assert!(!iban::is_valid("DE90 8306 5408 0004 1042 43"));
+    /// ```
     pub fn is_valid(iban: &str) -> bool {
         let iban = iban.replace(" ", "");
         iban.len() > 4
@@ -41,10 +56,28 @@ pub mod iban {
     }
 }
 
+/// RF (Structured Creditor Reference) validation functions
 pub mod rf {
     use crate::ibanrf::transform;
 
-    /// Check the validity of a structured RF creditor reference
+    /// Check the validity of a structured RF creditor reference according to ISO 11649
+    ///
+    /// # Arguments
+    ///
+    /// * `reference` - The RF reference string to validate
+    ///
+    /// # Returns
+    ///
+    /// `true` if the reference is valid, `false` otherwise
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use epcgen::rf;
+    ///
+    /// assert!(rf::is_valid("RF45G72UUR"));
+    /// assert!(!rf::is_valid("RF55G72UUR"));
+    /// ```
     pub fn is_valid(reference: &str) -> bool {
         reference.len() > 4
             && reference.len() <= 25
