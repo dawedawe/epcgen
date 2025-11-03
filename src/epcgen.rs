@@ -214,10 +214,6 @@ impl Error for EpcError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        self.source()
-    }
 }
 
 pub struct Builder<'a> {
