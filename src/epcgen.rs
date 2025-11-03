@@ -419,7 +419,7 @@ impl<'a> Builder<'a> {
             amount: amount.map(|s| s.to_string()),
             purpose: self.purpose.clone(),
             remittance: self.remittance.clone(),
-            information: self.information.map(|s| s.to_string()).clone(),
+            information: self.information.map(|s| s.to_string()),
         })
     }
 }
