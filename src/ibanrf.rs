@@ -1,6 +1,6 @@
 fn transform(s: &str) -> u128 {
-    let first4 = s.get(0..4).unwrap_or("");
-    let after4 = s.get(4..).unwrap_or("");
+    let first4 = s.get(0..4).expect("expected IBAN with len >= 4");
+    let after4 = s.get(4..).expect("expected IBAN with len >= 5");
     let switched = format!("{after4}{first4}");
     let replaced: String = switched
         .chars()
@@ -13,7 +13,10 @@ fn transform(s: &str) -> u128 {
             }
         })
         .collect();
-    replaced.as_str().parse().unwrap_or(0)
+    replaced
+        .as_str()
+        .parse()
+        .expect("expected parseable string")
 }
 
 /// IBAN validation functions

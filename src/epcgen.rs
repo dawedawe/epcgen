@@ -136,9 +136,9 @@ pub struct Epc {
     identification: Identification,
     /// The BIC code of the Beneficiary PSP
     bic: Option<String>,
-    /// The name of the accout of the Beneficiary
+    /// The name of the account of the Beneficiary
     beneficiary: String,
-    /// The IBAN of the accout of the Beneficiary
+    /// The IBAN of the account of the Beneficiary
     iban: String,
     /// Amount of the SEPA Credit Transfer in Euro
     amount: Option<String>,
@@ -243,9 +243,9 @@ pub struct Builder<'a> {
     identification: Option<Identification>,
     /// The BIC code of the Beneficiary PSP
     bic: Option<&'a str>,
-    /// The name of the accout of the Beneficiary
+    /// The name of the account of the Beneficiary
     beneficiary: Option<&'a str>,
-    /// The IBAN of the accout of the Beneficiary
+    /// The IBAN of the account of the Beneficiary
     iban: Option<String>,
     /// Amount of the SEPA Credit Transfer in Euro
     amount: Option<&'a str>,
