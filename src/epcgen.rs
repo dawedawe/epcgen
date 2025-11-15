@@ -3,6 +3,7 @@ use crate::ibanrf::rf;
 use std::error::Error;
 use std::fmt::Display;
 
+/// Service Tag
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ServiceTag {
     Bcd,
@@ -16,6 +17,7 @@ impl Display for ServiceTag {
     }
 }
 
+/// Version of the EPC
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Version {
     /// 001 - EWR plus Non-EWR
@@ -33,24 +35,25 @@ impl Display for Version {
     }
 }
 
+/// Character set used to generate the QR code
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CharacterSet {
-    /// 1
+    /// Encoded as value 1 in the EPC
     UTF8,
     // todo
-    // 2
+    // Encoded as value 2 in the EPC
     // Iso8859_1,
-    // 3
+    // Encoded as value 3 in the EPC
     // Iso8859_2,
-    // 4
+    // Encoded as value 4 in the EPC
     // Iso8859_4,
-    // 5
+    // Encoded as value 5 in the EPC
     // Iso8859_5,
-    // 6
+    // Encoded as value 6 in the EPC
     // Iso8859_7,
-    // 7
+    // Encoded as value 7 in the EPC
     // Iso8859_10,
-    // 8
+    // Encoded as value 8 in the EPC
     // Iso8859_15,
 }
 
@@ -62,6 +65,7 @@ impl Display for CharacterSet {
     }
 }
 
+/// Identification code
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Identification {
     /// SEPA Credit Transfer
@@ -79,8 +83,10 @@ impl Display for Identification {
     }
 }
 
+/// Purpose of the SEPA credit transfer
 #[derive(Debug, PartialEq, Clone)]
 pub enum Purpose {
+    /// Benefit
     Bene,
     // Todo add more
     /// A custom purpose code, max len 4
@@ -96,6 +102,7 @@ impl Display for Purpose {
     }
 }
 
+/// Remittance information
 #[derive(Debug, PartialEq, Clone)]
 pub enum Remittance {
     /// The structured RF creditor reference
@@ -113,6 +120,7 @@ impl Display for Remittance {
     }
 }
 
+/// Models an EPC
 #[derive(Debug, PartialEq)]
 pub struct Epc {
     /// Service Tag
@@ -144,6 +152,7 @@ impl<'a> Epc {
         Builder::default()
     }
 }
+
 impl Display for Epc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let empty_string = "".to_string();
@@ -173,18 +182,30 @@ impl Display for Epc {
     }
 }
 
+/// Possible errors when generating an EPC
 #[derive(Debug, PartialEq)]
 pub enum EpcError {
+    /// Version not set
     MissingVersion,
+    /// Character set not set
     MissingCharacterSet,
+    /// Identification not set
     MissingIdentification,
+    /// In the configured version a BIC must be set
     BICRequiredInConfiguredVersion,
+    /// Missing beneficiary
     MissingBeneficiary,
+    /// Given IBAN is invalid
     InvalidIBAN,
+    /// IBAN not set
     MissingIBAN,
+    /// Given Amount is invalid
     InvalidAmount,
+    /// Given purpose is invalid
     InvalidPurpose,
+    /// Given remittance reference is invalid
     InvalidRemittanceReference,
+    /// Given remittance text is too long
     RemittanceTextTooLong,
 }
 
@@ -216,6 +237,7 @@ impl Error for EpcError {
     }
 }
 
+/// Builder for EPCs
 pub struct Builder<'a> {
     /// Service Tag
     service_tag: ServiceTag,
@@ -321,7 +343,7 @@ impl<'a> Builder<'a> {
         self
     }
 
-    /// Build the resulting Epc
+    /// Build the resulting EPC
     pub fn build(&'_ self) -> Result<Epc, EpcError> {
         let version = if let Some(version) = self.version {
             version
