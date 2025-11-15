@@ -19,6 +19,7 @@ fn transform(s: &str) -> u128 {
         .expect("expected parseable string")
 }
 
+/// IBAN utilities
 pub mod iban {
     use crate::ibanrf::transform;
 
@@ -41,6 +42,7 @@ pub mod iban {
     }
 }
 
+/// RF utilities
 pub mod rf {
     use crate::ibanrf::transform;
 
