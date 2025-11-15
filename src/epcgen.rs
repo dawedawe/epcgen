@@ -88,7 +88,20 @@ impl Display for Identification {
 pub enum Purpose {
     /// Benefit
     Bene,
-    // Todo add more
+    /// Bonus payment
+    Bonu,
+    /// Capital builing fringe fortune
+    Cbff,
+    /// Charity
+    Char,
+    /// Government payment
+    Govt,
+    /// Pension payment
+    Pens,
+    /// Salary payment
+    Sala,
+    /// Social security benefit
+    SSBE,
     /// A custom purpose code, max len 4
     Custom(String),
 }
@@ -97,6 +110,13 @@ impl Display for Purpose {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Purpose::Bene => write!(f, "BENE"),
+            Purpose::Bonu => write!(f, "BONU"),
+            Purpose::Cbff => write!(f, "CBFF"),
+            Purpose::Char => write!(f, "CHAR"),
+            Purpose::Govt => write!(f, "GOVT"),
+            Purpose::Pens => write!(f, "PENS"),
+            Purpose::Sala => write!(f, "SALA"),
+            Purpose::SSBE => write!(f, "SSBE"),
             Purpose::Custom(c) => write!(f, "{}", c),
         }
     }
