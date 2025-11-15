@@ -46,6 +46,7 @@ pub mod rf {
 
     /// Check the validity of a structured RF creditor reference
     pub fn is_valid(reference: &str) -> bool {
+        let reference = reference.replace(" ", "");
         reference.len() > 4
             && reference.len() <= 25
             && reference.starts_with("RF")
@@ -54,7 +55,7 @@ pub mod rf {
                 .unwrap()
                 .chars()
                 .all(|c| c.is_numeric() || c.is_ascii_uppercase())
-            && transform(reference) % 97 == 1
+            && transform(reference.as_str()) % 97 == 1
     }
 }
 
@@ -94,5 +95,10 @@ mod tests {
     fn invalid_structured_references_should_fail() {
         assert!(!rf::is_valid(""));
         assert!(!rf::is_valid("RF55G72UUR"));
+    }
+
+    #[test]
+    fn valid_structured_references_should_validate() {
+        assert!(rf::is_valid("RF18 5390 0754 7034"));
     }
 }

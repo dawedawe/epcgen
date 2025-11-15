@@ -308,7 +308,10 @@ impl<'a> Builder<'a> {
 
     /// Set the Remittance (reference)
     pub fn remittance(mut self, remittance: Remittance) -> Self {
-        self.remittance = Some(remittance);
+        self.remittance = match remittance {
+            Remittance::Reference(r) => Some(Remittance::Reference(r.replace(" ", ""))),
+            Remittance::Text(_) => Some(remittance),
+        };
         self
     }
 
@@ -639,5 +642,24 @@ mod tests {
             ));
         let r = builder.build();
         assert_eq!(r, Result::Err(EpcError::InvalidRemittanceReference));
+    }
+
+    #[test]
+    fn valid_remittance_reference_with_spaces_should_succeed() {
+        let builder = Epc::builder()
+            .version(Version::V1)
+            .character_set(CharacterSet::UTF8)
+            .identification(Identification::Sct)
+            .bic("GENODEF1SLR")
+            .beneficiary("Codeberg e.V.")
+            .iban("DE90 8306 5408 0004 1042 42")
+            .remittance(Remittance::Reference("RF18 5390 0754 7034".to_string()));
+        let epc = builder.build();
+        assert!(epc.is_ok());
+        let epc = epc.unwrap();
+        assert_eq!(
+            "BCD\n001\n1\nSCT\nGENODEF1SLR\nCodeberg e.V.\nDE90830654080004104242\n\n\nRF18539007547034\n\n",
+            epc.to_string()
+        );
     }
 }
