@@ -1,3 +1,27 @@
+## [0.3.0] - 2025-11-15
+
+### 🚀 Features
+
+- Support RF references with spaces
+- Add commonly used purpose codes
+
+### 🐛 Bug Fixes
+
+- Fix some typos in comments
+
+### 🚜 Refactor
+
+- Remove a superfluous clone call
+- Remove deprecate Error::cause() implementation
+
+### 📚 Documentation
+
+- Add github-specific README.md
+- Improve docs
+
+### ⚙️ Miscellaneous Tasks
+
+- Add CHANGELOG.md
 ## [0.2.0] - 2025-11-02
 
 ### 🚀 Features
